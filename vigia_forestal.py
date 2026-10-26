@@ -13,14 +13,9 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.checkpoint.memory import InMemorySaver
 
-
-
-"""
-================================================================================
-CONFIGURACIÓN INICIAL
-================================================================================
-
-"""
+# ================================================================================
+# CONFIGURACIÓN INICIAL
+# ================================================================================
 
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
@@ -52,12 +47,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-"""
-================================================================================
-PROMPT Y CONTEXTO
-================================================================================
-
-"""
+# ================================================================================
+# PROMPT Y CONTEXTO
+# ================================================================================
 
 def formatear_contexto(documentos: list) -> str:
     """Convierte los documentos recuperados en un texto con su fuente identificada"""
@@ -122,12 +114,9 @@ def construir_system_prompt(contexto: str, pregunta_interpretada: str = "") -> s
         </contexto>
     """
 
-"""
-================================================================================
-CREACCIÓN DEL AGENTE
-================================================================================
-
-"""
+# ================================================================================
+# CREACCIÓN DEL AGENTE
+# ================================================================================
 
 class EstadoAgente(MessagesState):
     pregunta_busqueda: str  # Pregunta reformulada que se usa para buscar en ChromaDB
@@ -197,12 +186,9 @@ def crear_agente():
 
     return grafo.compile(checkpointer=InMemorySaver())
 
-"""
-================================================================================
-ESTADO DE LA SESIÓN
-================================================================================
-
-"""
+# ================================================================================
+# ESTADO DE LA SESIÓN
+# ================================================================================
 
 def nueva_conversacion():
     """Reinicia el historial visible y asigna un nuevo identificador de conversación"""
@@ -212,12 +198,9 @@ def nueva_conversacion():
 if "messages" not in st.session_state:
     nueva_conversacion()
 
-"""
-================================================================================
-COMPROBACIONES PREVIAS
-================================================================================
-
-"""
+# ================================================================================
+# COMPROBACIONES PREVIAS
+# ================================================================================
 
 if not API_KEY:
     st.error("❌ No se ha encontrado la API key de Gemini. Configura la variable GEMINI_API_KEY en el archivo .env o en los secrets de Streamlit.")
@@ -229,12 +212,9 @@ if not os.path.exists(RUTA_CHROMA):
 
 agente = crear_agente()
 
-"""
-================================================================================
-SIDEBAR
-================================================================================
-
-"""
+# ================================================================================
+# SIDEBAR
+# ================================================================================
 
 with st.sidebar:
     st.title("🔥 Vigía Forestal")
@@ -262,3 +242,41 @@ with st.sidebar:
         st.rerun()
 
     st.caption("⚠️ Ante cualquier incendio, llama al **112**.")
+
+# ================================================================================
+# CHAT
+# ================================================================================
+
+st.title("🔥 Vigía Forestal")
+st.caption("Asistente experto en incendios forestales en España. Pregúntame sobre estadísticas, causas, grandes incendios, prevención o autoprotección: recuerdo el contexto de la conversación.")
+
+if not st.session_state.messages:
+    st.info("👋 ¡Hola! Escribe tu pregunta abajo o elige una de las preguntas de ejemplo del panel lateral.")
+
+for mensaje in st.session_state.messages:
+    with st.chat_message(mensaje["role"]):
+        st.markdown(mensaje["content"])
+
+pregunta = st.chat_input("Escribe tu pregunta sobre incendios forestales...")
+
+if not pregunta and "pregunta_pendiente" in st.session_state:
+    pregunta = st.session_state.pregunta_pendiente
+    del st.session_state.pregunta_pendiente     # La elimino para que no se vuelva a enviar en la siguiente recarga
+
+if pregunta:
+    st.session_state.messages.append({"role": "user", "content": pregunta})
+    with st.chat_message("user"):
+        st.markdown(pregunta)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Consultando la base de conocimiento..."):
+            try:
+                config = {"configurable": {"thread_id": st.session_state.thread_id}}
+                resultado = agente.invoke({"messages": [HumanMessage(content=pregunta)]}, config=config)
+                respuesta = resultado["messages"][-1].text
+            except Exception as e:
+                respuesta = f"❌ Se ha producido un error al consultar al asistente: {e}"
+
+        st.markdown(respuesta)
+
+    st.session_state.messages.append({"role": "assistant", "content": respuesta})
