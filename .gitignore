@@ -1,3 +1,4 @@
 .env
 .incendiosVenv/
+.venv/
 __pycache__/

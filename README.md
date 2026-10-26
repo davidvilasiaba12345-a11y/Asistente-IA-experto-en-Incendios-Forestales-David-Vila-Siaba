@@ -1,6 +1,6 @@
 # 🔥 Vigía Forestal - Asistente Experto en Incendios Forestales en España
 
-**Asistente conversacional con Google Gemini, RAG y LangGraph
+**Asistente conversacional con Google Gemini, RAG y LangGraph**
 
 Proyecto final del módulo de IA Generativa · Máster en Data Science & IA · Evolve
 Autor: **David Vila Siaba**
@@ -215,3 +215,195 @@ Diseñé el prompt de forma iterativa, probando su comportamiento y corrigiendo 
 La versión final se validó en el notebook con tres casos (pregunta con respuesta en el contexto, pregunta del dominio sin información disponible y pregunta fuera del dominio) y con una batería de siete preguntas que cubren todas las fuentes y situaciones previstas.
 
 No modifico la temperatura del modelo, ya que los modelos Gemini 3.5 utilizan parámetros de muestreo fijos: la precisión y la fidelidad de las respuestas se controlan mediante las instrucciones del prompt.
+
+---
+
+## 📁 Estructura del repositorio
+
+```
+├── data/
+│   ├── chroma_incendios/           # Base vectorial de ChromaDB ya generada
+│   ├── incendios/                  # Documentos PDF de la base de conocimiento
+│   │   ├── Consejos_Incendios_Forestales.pdf
+│   │   ├── Estadística-General-IF-Metodología.pdf
+│   │   └── incendios-decenio-2006-2015_tcm30-521617.pdf
+│   ├── eell-extra-codes.xlsx       # Tablas de códigos del dataset
+│   └── fires-all.csv               # Dataset histórico de incendios forestales (1968-2023)
+├── img/
+│   ├── app_vigia_forestal.png      # Captura de la aplicación web
+│   └── grafo_agente.png            # Diagrama del agente en LangGraph
+├── .gitignore
+├── README.md
+├── asistente_incendios.ipynb       # Notebook principal: construcción y evaluación del asistente
+├── requirements.txt                # Dependencias del proyecto
+└── vigia_forestal.py               # Aplicación web en Streamlit
+```
+
+El notebook está organizado en las siguientes secciones:
+
+| Nº | Sección | Contenido |
+|---|---|---|
+| 1 | Introducción | Dominio, base de conocimiento y enfoque técnico |
+| 2 | Librerías y configuración | Importaciones, carga de la API key y configuración de los modelos |
+| 3 | Documentos PDF | Carga, limpieza y división en fragmentos |
+| 4 | Dataset CSV | Limpieza, traducción de códigos y generación de resúmenes y fichas con pandas |
+| 5 | Base vectorial | Indexación en ChromaDB con Gemini Embeddings y pruebas de búsqueda |
+| 6 | System prompt | Diseño del prompt y pruebas de comportamiento |
+| 7 | Agente en LangGraph | Estado, nodos y grafo del agente |
+| 8 | Memoria | Checkpointer, conversaciones independientes e inspección del historial |
+| 9 | Batería de preguntas | Siete preguntas de ejemplo con sus respuestas analizadas |
+| 10 | Chat interactivo | Celda para conversar con el asistente |
+| 11 | Conclusiones | Decisiones técnicas, limitaciones y posibles mejoras |
+
+> La base vectorial (`data/chroma_incendios/`) se incluye ya generada, por lo que no es necesario volver a crear los embeddings para ejecutar el notebook o la aplicación. Si se desea regenerarla, basta con eliminar esa carpeta y ejecutar el notebook: la sección 5 la creará de nuevo (este proceso tarda unos 12 minutos por los límites de la cuota gratuita de la API de Gemini).
+
+---
+
+## ⚙️ Requisitos
+
+### Python
+
+El proyecto se ha desarrollado con **Python 3.14.4**. Las versiones de las dependencias son compatibles con Python 3.11 o superior.
+
+### Dependencias
+
+Todas las dependencias, con sus versiones exactas, se encuentran en [`requirements.txt`](requirements.txt):
+
+| Librería | Uso en el proyecto |
+|---|---|
+| `langchain`, `langchain-core` | Base del framework: documentos, mensajes y prompts |
+| `langchain-community` | Carga de los documentos PDF |
+| `langchain-text-splitters` | División de los documentos en fragmentos |
+| `langchain-google-genai` | Conexión con Gemini (LLM y embeddings) |
+| `langchain-chroma`, `chromadb` | Base de conocimiento vectorial |
+| `langgraph` | Construcción del agente y memoria de conversación |
+| `pandas` | Preprocesado del dataset CSV |
+| `pypdf`, `fonttools` | Extracción del texto de los PDF |
+| `python-dotenv` | Lectura de la API key desde el archivo `.env` |
+| `streamlit` | Interfaz web |
+
+Para ejecutar el notebook también es necesario un entorno compatible con Jupyter, como **VSCode** con la extensión de Jupyter o **Jupyter Notebook**, junto con el paquete `ipykernel`.
+
+### API de Google Gemini
+
+El proyecto utiliza la API de Google Gemini tanto para el modelo de lenguaje como para los embeddings. Para obtener una API key gratuita:
+
+1. Accede a [Google AI Studio](https://aistudio.google.com/app/apikey) con una cuenta de Google.
+2. Crea una nueva API key.
+3. Guárdala en un archivo `.env` en la raíz del proyecto (ver la sección de instalación).
+
+> ⚠️ La API key nunca debe incluirse en el código ni subirse al repositorio. El archivo `.env` está incluido en el `.gitignore`.
+
+La cuota gratuita de Gemini es suficiente para ejecutar el proyecto, ya que la base vectorial se incluye ya generada. Cada pregunta al asistente consume una petición de embeddings (límite de 1.000 diarias en el modelo `gemini-embedding-2`) y una o dos llamadas al modelo de lenguaje.
+
+---
+
+## 🚀 Instalación y ejecución
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/davidvilasiaba12345-a11y/Asistente-IA-experto-en-Incendios-Forestales-David-Vila-Siaba.git
+cd Asistente-IA-experto-en-Incendios-Forestales-David-Vila-Siaba
+```
+
+### 2. Crear el entorno virtual e instalar dependencias
+
+**Opción A: con `pip`**
+
+```bash
+python -m venv .venv
+```
+
+Activar el entorno:
+
+```bash
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+
+# Windows (Git Bash)
+source .venv/Scripts/activate
+
+# Linux / macOS
+source .venv/bin/activate
+```
+
+Instalar las dependencias:
+
+```bash
+pip install -r requirements.txt
+pip install ipykernel
+```
+
+**Opción B: con `uv`**
+
+```bash
+uv venv
+```
+
+Activar el entorno con los mismos comandos de la opción A y, después, instalar las dependencias:
+
+```bash
+uv pip install -r requirements.txt
+uv pip install ipykernel
+```
+
+> Si se prefiere gestionar el proyecto con `uv` en modo proyecto, también es posible ejecutar `uv init`, `uv add -r requirements.txt` y `uv add ipykernel`, y lanzar la aplicación con `uv run streamlit run vigia_forestal.py`. En este caso, `uv` crea automáticamente el entorno virtual `.venv`, que es el que debe seleccionarse como kernel del notebook.
+
+### 3. Configurar la API key
+
+Crear un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+
+```
+GEMINI_API_KEY=tu_api_key_de_gemini
+```
+
+> Los pasos 4 y 5 son independientes y pueden realizarse en cualquier orden, ya que la base vectorial se incluye ya generada en el repositorio. Solo sería necesario ejecutar primero el notebook si se elimina la carpeta `data/chroma_incendios`, ya que la aplicación carga la base vectorial, pero no la crea.
+
+### 4. Ejecutar el notebook
+
+1. Abrir `asistente_incendios.ipynb` en VSCode (o en Jupyter Notebook).
+2. Seleccionar como kernel el entorno virtual creado en el paso 2.
+3. Ejecutar todas las celdas en orden.
+
+Al ejecutar todas las celdas seguidas, la ejecución se detiene en la **sección 10** (chat interactivo) a la espera de que se escriba una pregunta. Para finalizar el chat y continuar, basta con escribir `salir`.
+
+### 5. Ejecutar la aplicación web
+
+Con el entorno virtual activado, desde la raíz del proyecto:
+
+```bash
+streamlit run vigia_forestal.py
+```
+
+La aplicación se abrirá en el navegador en `http://localhost:8501`.
+
+---
+
+## 💬 Aplicación web: Vigía Forestal
+
+La aplicación está desplegada en Streamlit Cloud y puede utilizarse directamente desde el navegador, sin necesidad de instalar nada:
+
+👉 **[Abrir Vigía Forestal](https://vigia-forestal.streamlit.app/)**
+
+![Captura de la aplicación](img/app_vigia_forestal.png)
+
+### Funcionalidades
+
+- **Chat con memoria:** el asistente recuerda la conversación, por lo que admite preguntas de seguimiento. Cada sesión del navegador es una conversación independiente.
+- **Preguntas de ejemplo:** el panel lateral incluye preguntas predefinidas que pueden lanzarse con un clic.
+- **Nueva conversación:** un botón permite borrar el historial y empezar de cero.
+- **Fuentes visibles:** el panel lateral muestra la base de conocimiento que consulta el asistente, y cada respuesta indica de qué fuente procede la información.
+- **Control de errores:** la aplicación comprueba al iniciarse que dispone de la API key y de la base vectorial, y muestra un aviso en el chat si se produce algún error al consultar la API, sin dejar de funcionar.
+
+La aplicación reutiliza la misma base vectorial, el mismo system prompt y el mismo agente de LangGraph que el notebook. El agente y la base vectorial se cargan una sola vez gracias a `st.cache_resource`, y cada sesión del navegador se identifica con su propio `thread_id`.
+
+### Despliegue
+
+La aplicación se ha desplegado en [Streamlit Community Cloud](https://share.streamlit.io) a partir de este repositorio, indicando `vigia_forestal.py` como archivo principal. La API key de Gemini se configura como *secret* en los ajustes de la aplicación, de modo que nunca se incluye en el código ni en el repositorio:
+
+```toml
+GEMINI_API_KEY = "tu_api_key_de_gemini"
+```
+
+> Al tratarse de la versión gratuita de Streamlit Cloud, la aplicación entra en reposo tras un tiempo sin uso. Si al abrirla aparece un aviso de que está "dormida", basta con pulsar el botón para reactivarla y esperar unos segundos.
