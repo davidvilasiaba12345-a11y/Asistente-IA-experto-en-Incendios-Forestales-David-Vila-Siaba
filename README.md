@@ -407,3 +407,107 @@ GEMINI_API_KEY = "tu_api_key_de_gemini"
 ```
 
 > Al tratarse de la versión gratuita de Streamlit Cloud, la aplicación entra en reposo tras un tiempo sin uso. Si al abrirla aparece un aviso de que está "dormida", basta con pulsar el botón para reactivarla y esperar unos segundos.
+
+---
+
+## 🧪 Ejemplos de uso
+
+A continuación se muestran algunas respuestas reales del asistente. La batería completa de preguntas de ejemplo, con el análisis de cada respuesta, se encuentra en la **sección 9 del notebook**.
+
+### Pregunta que combina varias fuentes
+
+> **👤 ¿Por qué se provocan los incendios intencionados en España?**
+
+```
+En España, los incendios intencionados se provocan por diversas motivaciones de origen humano. Según
+los registros de 1968 a 2022, las motivaciones más frecuentes con causa conocida son:
+
+* Pastores y ganaderos para regenerar el pasto.
+* Campesinos para eliminar matorral y residuos agrícolas.
+* Pirómanos.
+* Cazadores para facilitar la caza.
+* Vandalismo.
+
+Además, el análisis detallado del decenio 2006-2015 muestra que estas motivaciones también incluyen
+la quema agrícola ilegal y abandonada, venganzas, daños de animales, modificación del uso del suelo
+y otras razones relacionadas con disputas, protestas o la búsqueda de beneficios económicos.
+
+📚 Fuentes:
+- Los Incendios Forestales en España. Decenio 2006-2015 (Ministerio de Agricultura, Pesca y Alimentación), página 67
+- Estadística General de Incendios Forestales, registros 1968-2022
+```
+
+El asistente combina los datos del CSV con el informe del Decenio, distingue los dos periodos de referencia y cita ambas fuentes.
+
+### Conversación con memoria
+
+> **👤 ¿Cuál fue el mayor incendio de 2022?**
+>
+> 🤖 El mayor incendio forestal de 2022 se produjo el 17 de julio en **Losacio** (Zamora, Castilla y León), con **23.611,5 hectáreas** quemadas. Causa: rayo.
+>
+> **👤 ¿Cuál fue su causa?**
+>
+> 🤖 La causa del incendio de Losacio en 2022 fue un **rayo**.
+>
+> **👤 ¿Y cuántos grandes incendios hubo ese año?**
+>
+> 🤖 En el año 2022 hubo **56 grandes incendios forestales** (considerados aquellos de 500 hectáreas o más) en España.
+
+Gracias a la memoria y al nodo de reformulación, el agente interpreta *"su causa"* como *"la causa del incendio de Losacio en 2022"* y *"ese año"* como *"2022"*, y recupera en cada caso los documentos adecuados.
+
+### Situación de emergencia
+
+> **👤 Estoy de excursión por el monte y veo una columna de humo cerca, ¿qué hago?**
+
+```
+¡Llama inmediatamente al 112 o avisa con la mayor rapidez a los servicios de emergencia más próximos
+(como Servicios Forestales, Bomberos, Policía, Guardia Civil o Protección Civil)!
+
+Además, si te encuentras en las proximidades de un incendio, ten en cuenta estas pautas de
+autoprotección:
+* Trata de alejarte por las zonas laterales del incendio y que estén más desprovistas de vegetación.
+* Ve siempre en sentido contrario a la dirección del viento, ya que un cambio repentino puede hacer
+  que el fuego te rodee.
+* No te dirijas hacia barrancos u hondonadas.
+* No intentes escapar ladera arriba cuando el fuego ascienda por ella.
+
+📚 Fuentes: Consejos ante incendios forestales (Protección Civil, Ayuntamiento de Jerez), páginas 1 y 2.
+```
+
+El asistente aplica el protocolo de emergencia definido en el system prompt: indica en primer lugar que se llame al 112 y después ofrece las pautas de autoprotección de Protección Civil, adaptadas al tuteo.
+
+### Pregunta fuera de la base de conocimiento
+
+> **👤 ¿Cuántas hectáreas se quemaron en España en 2024?**
+
+```
+No dispongo de información sobre eso en mi base de conocimiento.
+
+Puedo ayudarte con estadísticas, causas, grandes incendios, distribución territorial, evolución
+histórica (periodo 1968-2022 y decenio 2006-2015), así como consejos de prevención y autoprotección
+frente a incendios forestales en España.
+```
+
+Aunque la búsqueda recupera resúmenes de otros años, el asistente reconoce que no dispone de datos de 2024 en lugar de inventarlos.
+
+---
+
+## ⚠️ Limitaciones y mejoras futuras
+
+| Limitación | Posible mejora |
+|---|---|
+| Los datos estadísticos llegan hasta 2022 y el informe analiza el decenio 2006-2015 | Incorporar los informes y avances estadísticos más recientes del Ministerio |
+| Solo hay fichas individuales para los incendios de 3.000 hectáreas o más, debido a los límites de la cuota gratuita de embeddings | Ampliar el número de fichas con una cuota de API mayor |
+| La base de conocimiento no incluye normativa | Añadir la Ley de Montes y la normativa autonómica de prevención de incendios |
+| El retriever recupera siempre los 5 documentos más similares, sin filtrar por año o comunidad | Aprovechar los metadatos que ya incluyen los documentos para filtrar la búsqueda según la pregunta |
+| La memoria (`InMemorySaver`) se pierde al reiniciar el notebook o la aplicación | Utilizar un checkpointer persistente respaldado por una base de datos |
+| Las respuestas se han evaluado revisándolas manualmente | Automatizar la evaluación con un LLM que actúe como juez sobre un conjunto de preguntas de referencia |
+| La aplicación pública utiliza una única API key con cuota gratuita, compartida por todos los usuarios | Establecer un límite de preguntas por sesión o utilizar una cuota de pago |
+
+---
+
+## 📄 Créditos
+
+- **Datos:** [Fundación Ciudadana Civio](https://datos.civio.es/dataset/todos-los-incendios-forestales/), a partir de la Estadística General de Incendios Forestales del Ministerio de Agricultura, Pesca y Alimentación.
+- **Documentos:** Ministerio de Agricultura, Pesca y Alimentación, Ministerio para la Transición Ecológica y el Reto Demográfico (MITECO) y Protección Civil del Ayuntamiento de Jerez.
+- **Autor:** David Vila Siaba · Proyecto final del módulo de IA Generativa · Máster en Data Science & IA · Evolve
