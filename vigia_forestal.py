@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import warnings
 
@@ -58,7 +59,7 @@ def formatear_contexto(documentos: list) -> str:
 
     bloques = []
     for i, doc in enumerate(documentos, start=1):
-        fuente = NOMBRES_FUENTES.get(doc.metadata["fuente"], doc.metadata["fuente"])  # Si no recomozco el archivo, uso su nombre tal cual
+        fuente = NOMBRES_FUENTES.get(doc.metadata["fuente"], doc.metadata["fuente"])  # Si no reconozco el archivo, uso su nombre tal cual
         if doc.metadata["tipo"] == "pdf":
             fuente += f", página {doc.metadata['pagina']}"
         bloques.append(f"[Documento {i} | Fuente: {fuente}]\n{doc.page_content}")
@@ -115,7 +116,7 @@ def construir_system_prompt(contexto: str, pregunta_interpretada: str = "") -> s
     """
 
 # ================================================================================
-# CREACCIÓN DEL AGENTE
+# CREACIÓN DEL AGENTE
 # ================================================================================
 
 class EstadoAgente(MessagesState):
@@ -187,6 +188,68 @@ def crear_agente():
     return grafo.compile(checkpointer=InMemorySaver())
 
 # ================================================================================
+# EVALUACIÓN CON LLM JUEZ
+# ================================================================================
+
+@st.cache_resource
+def crear_juez():
+    """Crea el LLM que actúa como juez de las respuestas"""
+    return ChatGoogleGenerativeAI(model=MODEL, google_api_key=API_KEY)
+
+def leer_json(texto: str) -> dict:
+    """Convierte la respuesta del juez en un diccionario, limpiando posibles marcas de markdown"""
+    texto = texto.strip().replace("```json", "").replace("```", "").strip()
+    try:
+        return json.loads(texto)
+    except Exception:
+        return {"error": "Respuesta del juez no válida"}
+
+def evaluar_respuesta(pregunta: str, contexto: str, respuesta: str) -> str:
+    """Evalúa la respuesta frente al contexto recuperado y devuelve un resumen de las notas"""
+    prompt = f"""Eres un evaluador experto en sistemas RAG (Retrieval-Augmented Generation).
+        Evalúa si la RESPUESTA del asistente se basa fielmente en el CONTEXTO que recuperó de su base de conocimiento.
+
+        <pregunta>
+        {pregunta}
+        </pregunta>
+
+        <contexto>
+        {contexto}
+        </contexto>
+
+        <respuesta_asistente>
+        {respuesta}
+        </respuesta_asistente>
+
+        Puntúa cada criterio con un número entero del 1 al 10:
+        - fidelidad: todas las afirmaciones y cifras de la respuesta están respaldadas por el CONTEXTO (10 = ninguna afirmación inventada).
+        - relevancia: la respuesta contesta a lo que se ha preguntado.
+        - citacion: las fuentes citadas al final de la respuesta corresponden a los documentos del CONTEXTO realmente utilizados.
+
+        Si la respuesta indica que no dispone de la información y el CONTEXTO efectivamente no la contiene, la fidelidad es 10. Si la respuesta no usa información del contexto y por tanto no cita fuentes, la citación es 10.
+
+        Si la respuesta es un mensaje conversacional que no aporta datos (un saludo, ofrecer los temas sobre los que puede ayudar o pedir que se concrete la pregunta), la fidelidad es 10. Una afirmación no respaldada es un dato o un hecho concreto, nunca la simple mención de un tema.
+
+        Responde ÚNICAMENTE con este JSON, sin texto adicional:
+        {{"fidelidad": número, "relevancia": número, "citacion": número, "afirmaciones_no_respaldadas": ["lista de afirmaciones que no aparecen en el contexto, vacía si no hay"], "justificacion": "máximo 2 frases"}}
+    """
+
+    try:
+        evaluacion = leer_json(crear_juez().invoke(prompt).text)
+    except Exception:
+        return "⚖️ No se ha podido evaluar esta respuesta."
+
+    if "error" in evaluacion:
+        return "⚖️ No se ha podido evaluar esta respuesta."
+
+    texto = (f"⚖️ **Evaluación del juez** · Fidelidad: {evaluacion.get('fidelidad')}/10 · Relevancia: {evaluacion.get('relevancia')}/10 · Citación: {evaluacion.get('citacion')}/10")
+
+    if evaluacion.get("afirmaciones_no_respaldadas"):
+        texto += " · ⚠️ Afirmaciones no respaldadas: " + "; ".join(evaluacion["afirmaciones_no_respaldadas"])
+
+    return texto
+
+# ================================================================================
 # ESTADO DE LA SESIÓN
 # ================================================================================
 
@@ -207,7 +270,7 @@ if not API_KEY:
     st.stop()
 
 if not os.path.exists(RUTA_CHROMA):
-    st.error("❌ No se ha encontado la base vectorial en 'data/chroma_incendios'. Ejecuta primero el notebook para generarla.")
+    st.error("❌ No se ha encontrado la base vectorial en 'data/chroma_incendios'. Ejecuta primero el notebook para generarla.")
     st.stop()
 
 agente = crear_agente()
@@ -237,6 +300,15 @@ with st.sidebar:
 
     st.divider()
 
+    st.subheader("⚖️ Evaluación")
+    evaluar = st.toggle(
+        "Evaluar respuestas con LLM juez",
+        value=False,
+        help="Un segundo LLM comprueba que cada respuesta es fiel a los documentos recuperados. Aumenta el tiempo de respuesta."
+    )
+
+    st.divider()
+
     if st.button("🆕 Nueva conversación", use_container_width=True, type="primary"):
         nueva_conversacion()
         st.rerun()
@@ -256,6 +328,8 @@ if not st.session_state.messages:
 for mensaje in st.session_state.messages:
     with st.chat_message(mensaje["role"]):
         st.markdown(mensaje["content"])
+        if mensaje.get("evaluacion"):
+            st.caption(mensaje["evaluacion"])
 
 pregunta = st.chat_input("Escribe tu pregunta sobre incendios forestales...")
 
@@ -275,8 +349,15 @@ if pregunta:
                 resultado = agente.invoke({"messages": [HumanMessage(content=pregunta)]}, config=config)
                 respuesta = resultado["messages"][-1].text
             except Exception as e:
+                resultado = None
                 respuesta = f"❌ Se ha producido un error al consultar al asistente: {e}"
 
         st.markdown(respuesta)
 
-    st.session_state.messages.append({"role": "assistant", "content": respuesta})
+        texto_evaluacion = ""
+        if evaluar and resultado:
+            with st.spinner("El juez está evaluando la respuesta..."):
+                texto_evaluacion = evaluar_respuesta(resultado["pregunta_busqueda"], resultado["contexto"], respuesta)  # Uso la pregunta reformulada para que el juez entienda las de seguimiento
+            st.caption(texto_evaluacion)
+
+    st.session_state.messages.append({"role": "assistant", "content": respuesta, "evaluacion": texto_evaluacion})

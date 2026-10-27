@@ -3,6 +3,7 @@
 **Asistente conversacional con Google Gemini, RAG y LangGraph**
 
 Proyecto final del módulo de IA Generativa · Máster en Data Science & IA · Evolve
+
 Autor: **David Vila Siaba**
 
 ---
@@ -13,11 +14,11 @@ Vigía Forestal es un asistente de inteligencia artificial especializado en **in
 
 El asistente combina tres técnicas de IA Generativa:
 
-- **RAG (Retrieval-Augmented Generation):** antes de responder, recupera de una base de conocimiento vectorial (ChromaDB) los fragmentos más relevantes para la pregunta y los utiliza como contexto, lo que reduce las alucinanciones y permite citar las fuentes.
+- **RAG (Retrieval-Augmented Generation):** antes de responder, recupera de una base de conocimiento vectorial (ChromaDB) los fragmentos más relevantes para la pregunta y los utiliza como contexto, lo que reduce las alucinaciones y permite citar las fuentes.
 - **Agente en LangGraph:** el flujo de cada pregunta se modela como un grafo de tres nodos (reformular, recuperar y generar) que comparten un estado común.
 - **Memoria de conversación:** el asistente recuerda los turnos anteriores, por lo que admite preguntas de seguimiento como *"¿y cuántas personas participaron en su extinción?"*.
 
-El proyecto incluye un **notebook** en el que se construye y evalúa el asistente paso a paso, y una **aplicación web en Streamlit** desplegada en Streamlit Cloud para conversar con él desde el navegador.
+El proyecto incluye un **notebook** en el que se construye y evalúa el asistente paso a paso, con una **evaluación automática mediante un LLM que actúa como juez**, y una **aplicación web en Streamlit** desplegada en Streamlit Cloud para conversar con él desde el navegador.
 
 | Recurso | Enlace |
 |---|---|
@@ -182,7 +183,7 @@ Responde a esta pregunta interpretada.
 
 </details>
 
-### Técnicas de ingienería de prompts aplicadas
+### Técnicas de ingeniería de prompts aplicadas
 
 | Técnica | Cómo la aplico | Por qué |
 |---|---|---|
@@ -201,7 +202,7 @@ Responde a esta pregunta interpretada.
 - **Protocolo de emergencia (instrucción 6):** si alguien consulta al asistente durante un incendio real, lo prioritario es que llame al 112 y conozca las pautas de autoprotección.
 - **Citación de fuentes:** cada respuesta indica de qué documento (y, en los PDF, de qué página) procede la información, de modo que el usuario puede verificarla.
 
-### Interación y validación
+### Iteración y validación
 
 Diseñé el prompt de forma iterativa, probando su comportamiento y corrigiendo los problemas detectados:
 
@@ -212,7 +213,7 @@ Diseñé el prompt de forma iterativa, probando su comportamiento y corrigiendo 
 | En preguntas de seguimiento (*"¿y en esa comunidad?"*) descartaba el documento correcto porque la pregunta literal no lo mencionaba | Inclusión de la pregunta reformulada en el prompt (sección PREGUNTA ACTUAL) |
 | Mezclaba el tuteo con el usted al reproducir los consejos de Protección Civil | Instrucción de tutear siempre al usuario |
 
-La versión final se validó en el notebook con tres casos (pregunta con respuesta en el contexto, pregunta del dominio sin información disponible y pregunta fuera del dominio) y con una batería de siete preguntas que cubren todas las fuentes y situaciones previstas.
+La versión final se validó en el notebook con tres casos (pregunta con respuesta en el contexto, pregunta del dominio sin información disponible y pregunta fuera del dominio), con una batería de siete preguntas que cubren todas las fuentes y situaciones previstas y, por último, con una evaluación automática mediante un LLM como juez (ver la sección de evaluación).
 
 No modifico la temperatura del modelo, ya que los modelos Gemini 3.5 utilizan parámetros de muestreo fijos: la precisión y la fidelidad de las respuestas se controlan mediante las instrucciones del prompt.
 
@@ -252,8 +253,9 @@ El notebook está organizado en las siguientes secciones:
 | 7 | Agente en LangGraph | Estado, nodos y grafo del agente |
 | 8 | Memoria | Checkpointer, conversaciones independientes e inspección del historial |
 | 9 | Batería de preguntas | Siete preguntas de ejemplo con sus respuestas analizadas |
-| 10 | Chat interactivo | Celda para conversar con el asistente |
-| 11 | Conclusiones | Decisiones técnicas, limitaciones y posibles mejoras |
+| 10 | Evaluación con LLM como juez | Benchmark con referencia, evaluación sin referencia y prueba de control del juez |
+| 11 | Chat interactivo | Celda para conversar con el asistente |
+| 12 | Conclusiones | Decisiones técnicas, limitaciones y posibles mejoras |
 
 > La base vectorial (`data/chroma_incendios/`) se incluye ya generada, por lo que no es necesario volver a crear los embeddings para ejecutar el notebook o la aplicación. Si se desea regenerarla, basta con eliminar esa carpeta y ejecutar el notebook: la sección 5 la creará de nuevo (este proceso tarda unos 12 minutos por los límites de la cuota gratuita de la API de Gemini).
 
@@ -294,7 +296,7 @@ El proyecto utiliza la API de Google Gemini tanto para el modelo de lenguaje com
 
 > ⚠️ La API key nunca debe incluirse en el código ni subirse al repositorio. El archivo `.env` está incluido en el `.gitignore`.
 
-La cuota gratuita de Gemini es suficiente para ejecutar el proyecto, ya que la base vectorial se incluye ya generada. Cada pregunta al asistente consume una petición de embeddings (límite de 1.000 diarias en el modelo `gemini-embedding-2`) y una o dos llamadas al modelo de lenguaje.
+La cuota gratuita de Gemini es suficiente para ejecutar el proyecto, ya que la base vectorial se incluye ya generada. Cada pregunta al asistente consume una petición de embeddings (límite de 1.000 diarias en el modelo `gemini-embedding-2`) y una o dos llamadas al modelo de lenguaje (una más si se activa la evaluación con el LLM juez).
 
 ---
 
@@ -366,7 +368,7 @@ GEMINI_API_KEY=tu_api_key_de_gemini
 2. Seleccionar como kernel el entorno virtual creado en el paso 2.
 3. Ejecutar todas las celdas en orden.
 
-Al ejecutar todas las celdas seguidas, la ejecución se detiene en la **sección 10** (chat interactivo) a la espera de que se escriba una pregunta. Para finalizar el chat y continuar, basta con escribir `salir`.
+Al ejecutar todas las celdas seguidas, la ejecución se detiene en la **sección 11** (chat interactivo) a la espera de que se escriba una pregunta. El chat admite los comandos `nueva` (nueva conversación), `evaluar` (activa o desactiva la evaluación automática de cada respuesta) y `salir` (finaliza el chat y continúa con el resto del notebook).
 
 ### 5. Ejecutar la aplicación web
 
@@ -392,6 +394,7 @@ La aplicación está desplegada en Streamlit Cloud y puede utilizarse directamen
 
 - **Chat con memoria:** el asistente recuerda la conversación, por lo que admite preguntas de seguimiento. Cada sesión del navegador es una conversación independiente.
 - **Preguntas de ejemplo:** el panel lateral incluye preguntas predefinidas que pueden lanzarse con un clic.
+- **Evaluación con LLM juez (opcional):** desde el panel lateral se puede activar el interruptor *"Evaluar respuestas con LLM juez"*. Con él activado, un segundo modelo comprueba cada respuesta frente a los documentos recuperados y muestra debajo sus notas de fidelidad, relevancia y citación, junto con las afirmaciones no respaldadas si las hay. Está desactivado por defecto porque cada evaluación es una llamada más al modelo y aumenta el tiempo de respuesta.
 - **Nueva conversación:** un botón permite borrar el historial y empezar de cero.
 - **Fuentes visibles:** el panel lateral muestra la base de conocimiento que consulta el asistente, y cada respuesta indica de qué fuente procede la información.
 - **Control de errores:** la aplicación comprueba al iniciarse que dispone de la API key y de la base vectorial, y muestra un aviso en el chat si se produce algún error al consultar la API, sin dejar de funcionar.
@@ -492,6 +495,46 @@ Aunque la búsqueda recupera resúmenes de otros años, el asistente reconoce qu
 
 ---
 
+## 📏 Evaluación del asistente
+
+La calidad del asistente se evalúa automáticamente en la **sección 10 del notebook** mediante un segundo LLM que actúa como **juez** (*LLM-as-Judge*), con dos métodos complementarios:
+
+| Método | Qué recibe el juez | Qué mide |
+|---|---|---|
+| **Con referencia** | Pregunta, respuesta y una respuesta de referencia correcta | Corrección, completitud y claridad |
+| **Sin referencia** | Pregunta, respuesta y el contexto recuperado de ChromaDB | Fidelidad al contexto (ausencia de alucinaciones), relevancia y citación de fuentes |
+
+La evaluación sin referencia no necesita conocer la respuesta correcta, por lo que puede aplicarse a cualquier pregunta. Además, se comprueba automáticamente si la búsqueda recuperó la fuente que contiene la respuesta.
+
+### Resultados
+
+Sobre un benchmark de 8 preguntas (datos históricos, territoriales, conceptuales, grandes incendios, autoprotección y una pregunta sin información disponible):
+
+| Criterio | Nota media |
+|---|---|
+| Corrección | 10/10 |
+| Completitud | 10/10 |
+| Claridad | 10/10 |
+| Fidelidad al contexto | 10/10 |
+| Relevancia | 10/10 |
+| Citación de fuentes | 10/10 |
+| **Recuperación de la fuente correcta** | **7 de 7 preguntas** |
+
+### Validación del juez
+
+Para comprobar que estas notas no se deben a un juez demasiado benévolo, se le pasan dos respuestas erróneas a propósito:
+
+| Respuesta de control | Nota | Resultado |
+|---|---|---|
+| Dato incorrecto (1994 como peor año en lugar de 1985) | Corrección: 1/10 | Detecta el dato erróneo |
+| Afirmación inventada (300 muertos que no aparecen en el contexto) | Fidelidad: 3/10 | Identifica literalmente la frase inventada |
+
+El juez penaliza ambos errores, lo que confirma que discrimina entre respuestas correctas e incorrectas. Aun así, el benchmark es reducido y el juez utiliza el mismo modelo que el asistente, por lo que los resultados deben interpretarse como una validación del comportamiento esperado y no como una medida exhaustiva.
+
+Además de la evaluación del notebook, el juez puede activarse en el chat del notebook (comando `evaluar`) y en la aplicación web. Al probarlo en la aplicación detecté un falso positivo: ante un “sí” después de un saludo, marcaba como no respaldada la simple mención de un tema. Lo corregí añadiendo al prompt del juez una regla para los mensajes conversacionales, lo que muestra que el propio juez también requiere ingeniería de prompts.
+
+---
+
 ## ⚠️ Limitaciones y mejoras futuras
 
 | Limitación | Posible mejora |
@@ -501,7 +544,8 @@ Aunque la búsqueda recupera resúmenes de otros años, el asistente reconoce qu
 | La base de conocimiento no incluye normativa | Añadir la Ley de Montes y la normativa autonómica de prevención de incendios |
 | El retriever recupera siempre los 5 documentos más similares, sin filtrar por año o comunidad | Aprovechar los metadatos que ya incluyen los documentos para filtrar la búsqueda según la pregunta |
 | La memoria (`InMemorySaver`) se pierde al reiniciar el notebook o la aplicación | Utilizar un checkpointer persistente respaldado por una base de datos |
-| Las respuestas se han evaluado revisándolas manualmente | Automatizar la evaluación con un LLM que actúe como juez sobre un conjunto de preguntas de referencia |
+| El benchmark de evaluación es reducido (8 preguntas) | Ampliarlo con más preguntas, incluyendo consultas más difíciles o ambiguas |
+| El juez es el mismo modelo que genera las respuestas, lo que puede introducir sesgo | Utilizar como juez un modelo distinto o más potente que el del asistente |
 | La aplicación pública utiliza una única API key con cuota gratuita, compartida por todos los usuarios | Establecer un límite de preguntas por sesión o utilizar una cuota de pago |
 
 ---
